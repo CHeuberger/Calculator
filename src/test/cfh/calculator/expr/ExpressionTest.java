@@ -1,31 +1,43 @@
-package cfh.calculator;
+package cfh.calculator.expr;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.text.ParseException;
-import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import cfh.calculator.Expression;
+import cfh.calculator.data.DataType;
+import cfh.calculator.data.DoubleData;
+import cfh.calculator.data.Environment;
+
+
 class ExpressionTest {
 
-    static class Unspecific {
-        @ParameterizedTest
-        @CsvSource({
-            "2 * 3 + 5, 11",
-            "2 + 3 * 5, 17",
-            "(2+3) * 5, 25"
-        })
-        void test(String text, double expected) throws Exception {
-            var expr = Expression.parse(text);
-            assertEquals(expected, expr.eval(null));
-        }
-    }
+//    static class Unspecific {
+//        @ParameterizedTest
+//        @CsvSource({
+//            "2 * 3 + 5, 11",
+//            "2 + 3 * 5, 17",
+//            "(2+3) * 5, 25"
+//        })
+//        void test(String text, double expected) throws Exception {
+//            var expr = ExpressionImpl.parse(text);
+//            assertEquals(expected, expr.eval(null));
+//        }
+//    }
     
     static class ParseTests {
+        
+        @Test
+        void testParseDouble() throws Exception {
+            Expression<DoubleData> expr = Expression.parse(DataType.DOUBLE, "123");
+            assertInstanceOf(Literal.class, expr);
+            assertInstanceOf(DoubleData.class, expr.eval(new Environment<>()));
+        }
         
         // primary = literal | variable | function | '(' expression ')'
         static class PrimaryTests {
@@ -36,16 +48,16 @@ class ExpressionTest {
                     ".4,  0.4"
             })
             void testLiteral(String text, double expected) throws Exception {
-                var expr = Expression.parse(text);
-                assertInstanceOf(Expression.Literal.class, expr);
-                assertEquals(expected, expr.eval(null));
+                var expr = Expression.parseDouble(text);
+                assertInstanceOf(Literal.class, expr);
+                assertEquals(expected, expr.evalDouble(null));
             }
 
             @Test()
             void testLiteralException() throws Exception {
                 ParseException ex = assertThrows(
                     ParseException.class,
-                    () -> Expression.parse("1.2.3")
+                    () -> Expression.parseDouble("1.2.3")
                     );
                 assertEquals(0, ex.getErrorOffset());
                 assertInstanceOf(NumberFormatException.class, ex.getCause());
@@ -58,8 +70,8 @@ class ExpressionTest {
                     "x + y, 11.3"
             })
             void testVariable(String text, double expected) throws Exception {
-                var expr = Expression.parse(text);
-                assertEquals(expected, expr.eval(Map.of("x", 12.3, "y", -1.0)));
+                var expr = Expression.parseDouble(text);
+                assertEquals(expected, expr.evalDouble(Environment.of("x", 12.3, "y", -1.0)));
             }
 
             @ParameterizedTest
@@ -73,26 +85,26 @@ class ExpressionTest {
                     "cos(PI/2),  0.0"
             })
             void testFunction(String text, double expected) throws Exception {
-                var expr = Expression.parse(text);
-                assertInstanceOf(Expression.Call.class, expr);
-                assertEquals(expected, expr.eval(Map.of("PI", Math.PI)), 0.001);
+                var expr = Expression.parseDouble(text);
+                assertInstanceOf(FunctionCall.class, expr);
+                assertEquals(expected, expr.evalDouble(Environment.of("PI", Math.PI)), 0.001);
             }
             
             @Test
             void testFunctionException() throws Exception {
                 ParseException ex = assertThrows(
                     ParseException.class,
-                    () -> Expression.parse("nonexistent(1)")
+                    () -> Expression.parseDouble("nonexistent(1)")
                     );
-                assertEquals(0, ex.getErrorOffset());
                 assertTrue(ex.getMessage().contains("nonexisten"));
+                assertEquals(0, ex.getErrorOffset());
             }
 
             @Test
             void testParenthesis() throws Exception {
-                var expr = Expression.parse("(10.0)");
-                assertInstanceOf(Expression.Literal.class, expr);
-                assertEquals(10.0, expr.eval(null));
+                var expr = Expression.parseDouble("(10.0)");
+                assertInstanceOf(Literal.class, expr);
+                assertEquals(10.0, expr.evalDouble(null));
             }
         }
         
@@ -104,9 +116,9 @@ class ExpressionTest {
                 "+ 11.0, 11.0"
             })
             void testUnaryPos(String text, double expected) throws Exception {
-                var expr = Expression.parse(text);
-                assertInstanceOf(Expression.Literal.class, expr);
-                assertEquals(expected, expr.eval(null));
+                var expr = Expression.parseDouble(text);
+                assertInstanceOf(Unary.class, expr);
+                assertEquals(expected, expr.evalDouble(null));
                 
             }
             
@@ -116,16 +128,16 @@ class ExpressionTest {
                 "- 21.0, -21.0"
             })
             void testUnaryNeg(String text, double expected) throws Exception {
-                var expr = Expression.parse(text);
-                assertInstanceOf(Expression.Negate.class, expr);
-                assertEquals(expected, expr.eval(null));
+                var expr = Expression.parseDouble(text);
+                assertInstanceOf(Unary.class, expr);
+                assertEquals(expected, expr.evalDouble(null));
             }
             
             @Test
             void testUnaryNone() throws Exception {
-                var expr = Expression.parse("30.0");
-                assertInstanceOf(Expression.Literal.class, expr);
-                assertEquals(30.0, expr.eval(null));
+                var expr = Expression.parseDouble("30.0");
+                assertInstanceOf(Literal.class, expr);
+                assertEquals(30.0, expr.evalDouble(null));
             }
             
             @ParameterizedTest
@@ -133,7 +145,7 @@ class ExpressionTest {
             void testUnaryException(String text) {
                 ParseException ex = assertThrows(
                     ParseException.class,
-                    () -> Expression.parse(text)
+                    () -> Expression.parseDouble(text)
                     );
                 assertEquals(1, ex.getErrorOffset());
             }
@@ -147,9 +159,9 @@ class ExpressionTest {
                 "3*4*5, 60"
             })
             void testMultiplication(String text, double expected) throws Exception {
-                var expr = Expression.parse(text);
-                assertInstanceOf(Expression.Multiplicate.class, expr);
-                assertEquals(expected, expr.eval(null));
+                var expr = Expression.parseDouble(text);
+                assertInstanceOf(Binary.class, expr);
+                assertEquals(expected, expr.evalDouble(null));
             }
             
             @ParameterizedTest
@@ -158,9 +170,9 @@ class ExpressionTest {
                 "60/5/4, 3"
             })
             void testDivision(String text, double expected) throws Exception {
-                var expr = Expression.parse(text);
-                assertInstanceOf(Expression.Divide.class, expr);
-                assertEquals(expected, expr.eval(null));
+                var expr = Expression.parseDouble(text);
+                assertInstanceOf(Binary.class, expr);
+                assertEquals(expected, expr.evalDouble(null));
             }
             
             @ParameterizedTest
@@ -170,9 +182,9 @@ class ExpressionTest {
                 "28%10%3, 2"
             })
             void testRemainder(String text, double expected) throws Exception {
-                var expr = Expression.parse(text);
-                assertInstanceOf(Expression.Remainder.class, expr);
-                assertEquals(expected, expr.eval(null));
+                var expr = Expression.parseDouble(text);
+                assertInstanceOf(Binary.class, expr);
+                assertEquals(expected, expr.evalDouble(null));
             }
         }
         
@@ -184,9 +196,9 @@ class ExpressionTest {
                 "3+4+5, 12"
             })
             void testAdd(String text, double expected) throws Exception {
-                var expr = Expression.parse(text);
-                assertInstanceOf(Expression.Add.class, expr);
-                assertEquals(expected, expr.eval(null));
+                var expr = Expression.parseDouble(text);
+                assertInstanceOf(Binary.class, expr);
+                assertEquals(expected, expr.evalDouble(null));
             }
             
             @ParameterizedTest
@@ -195,9 +207,9 @@ class ExpressionTest {
                 "60-5-4, 51"
             })
             void testSubtract(String text, double expected) throws Exception {
-                var expr = Expression.parse(text);
-                assertInstanceOf(Expression.Subtract.class, expr);
-                assertEquals(expected, expr.eval(null));
+                var expr = Expression.parseDouble(text);
+                assertInstanceOf(Binary.class, expr);
+                assertEquals(expected, expr.evalDouble(null));
             }
         }
     }

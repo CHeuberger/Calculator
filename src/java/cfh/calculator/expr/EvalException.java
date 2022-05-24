@@ -1,4 +1,5 @@
-package cfh.calculator;
+package cfh.calculator.expr;
+
 
 public class EvalException extends Exception {
 
